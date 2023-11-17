@@ -1,0 +1,6 @@
+.idea/
+.env
+logs/
+__pycache__/
+ffmpeg/
+youtube-dl/
