@@ -1,30 +1,25 @@
 import asyncio
 import logging
-import os
 import re
 
 import discord
-import yt_dlp
+from discord import VoiceClient
 from discord.ext import commands
+from pytube import YouTube, StreamQuery, Stream
+from pytube import Search
 
 import config
 
 logger = logging.getLogger("bot")
 
-yt_opts = {
-    'format': 'bestaudio',
-    # 'noplaylist': True,
-    'verbose': True,
-    'force_keyframes_at_cuts': True,
-}
 FFMPEG_OPTIONS = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
                   "options": "-vn"}
 
 user_search_results: dict[str: list] = {}
 
-playlist = []
+playlist: list[YouTube] = []
 current_playlist_index = -1
-vc = None
+vc: VoiceClient
 is_playing = False
 is_paused = False
 
@@ -44,61 +39,18 @@ def main():
 
     async def search_yt(context, search_input):
 
-        def get_format(formats: list):
-            for format_ in formats:
-                if "144p" in format_["format_note"] and format_["audio_channels"]:
-                    return format_["url"]
-            for format_ in formats:
-                if "240p" in format_["format_note"] and format_["audio_channels"]:
-                    return format_["url"]
-            for format_ in formats:
-                if "360p" in format_["format_note"] and format_["audio_channels"]:
-                    return format_["url"]
-            for format_ in formats:
-                if "480p" in format_["format_note"] and format_["audio_channels"]:
-                    return format_["url"]
-            for format_ in formats:
-                if "720p" in format_["format_note"] and format_["audio_channels"]:
-                    return format_["url"]
-
-        await context.send("Searching in YouTube. This may take a couple of seconds.")
+        username = context.author.name
+        await context.send(f"@{context.author.display_name}, "
+                           f"Searching for \"{search_input}\". This may take a couple of seconds.")
 
         global is_playing
-        username = context.author.name
-        with yt_dlp.YoutubeDL(yt_opts) as ydl:
-            if contains_url(search_input):
-                info_dict = ydl.extract_info(f"ytsearch:{search_input}", download=False)
-            else:
-                info_dict = ydl.extract_info(f"ytsearch3:{search_input}", download=False)
-        if not contains_url(search_input):  # Searched using name/title`
-            found_items = [
-                {
-                    "title": entry["title"],
-                    "url": get_format(entry["formats"])
-                }
-                for entry in info_dict["entries"]
-            ]
-            user_search_results[username] = found_items
-            menu = [f"{index + 1} - {found_item['title']}" for index, found_item in enumerate(found_items)]
-            await context.send("Enter the number of the item to add to queue:\n" + "\n".join(menu))
-        else:  # Searched using URL
-            if not info_dict.get("id"):
-                await context.send("Invalid URL")
-                return
-            found_items = [
-                {
-                    "title": entry["title"],
-                    "url": get_format(entry["formats"])
-                }
-                for entry in info_dict["entries"]
-            ]
-            if found_items:
-                playlist.append({"title": found_items[0]["title"], "url": found_items[0]["url"]})
-                await context.send(f"Added to queue: {found_items[0]['title']}")
-            else:
-                await context.send("Failed to add URL")
-            if not is_playing:
-                await play_youtube_audio(context)
+
+        search = Search(search_input)
+        top_3: list[YouTube] = [result for result in search.results[0:3] if not result.age_restricted]
+        user_search_results[username] = top_3
+        menu = [f"{index + 1} - {result.author} - {result.title}" for index, result in enumerate(top_3)]
+        await context.send(f"@{context.author.display_name}, "
+                           f"Enter the number of the item to add to queue:\n" + "\n".join(menu))
 
     async def play_user_selected_item(context, user_selection: int):
         global is_playing
@@ -109,12 +61,33 @@ def main():
         user_selection -= 1
         item_to_play = users_results[user_selection]
         playlist.append(item_to_play)
-        await context.send(f"Added to queue: {item_to_play['title']}")
+        await context.send(f"Added to queue: {item_to_play.title}")
 
         if not is_playing:
             await play_youtube_audio(context)
 
     async def play_youtube_audio(ctx):
+
+        def get_best_audio_stream(audio_streams: StreamQuery):
+            best_stream = None
+            for stream_ in audio_streams.fmt_streams:
+                if not best_stream:
+                    best_stream = stream_
+                    continue
+                if stream_.abr > best_stream.abr:
+                    best_stream = stream_
+            return best_stream
+
+        def get_best_video_stream(video_streams: StreamQuery):
+            best_stream = None
+            for stream_ in video_streams.fmt_streams:
+                if not best_stream:
+                    best_stream = stream_
+                    continue
+                if stream_.resolution > best_stream.resolution:
+                    best_stream = stream_
+            return best_stream
+
         global vc, current_playlist_index, is_playing
         if current_playlist_index == len(playlist) - 1:
             is_playing = False
@@ -123,6 +96,10 @@ def main():
         is_playing = True
 
         current_playlist_index += 1
+        try:
+            vc
+        except:
+            vc = None
         if vc is None or not vc.is_connected():
             vc = await ctx.author.voice.channel.connect()
             if vc is None:
@@ -130,8 +107,17 @@ def main():
                 return
         else:
             await vc.move_to(ctx.author.voice.channel)
-        await ctx.send(f"Now playing: {playlist[current_playlist_index]['title']}")
-        vc.play(discord.FFmpegPCMAudio(playlist[current_playlist_index]["url"], **FFMPEG_OPTIONS),
+        await ctx.send(f"Now playing: {playlist[current_playlist_index].author} - "
+                       f"{playlist[current_playlist_index].title}")
+        audio_only_streams = playlist[current_playlist_index].streams.filter(only_audio=True)
+        progressive_stream = playlist[current_playlist_index].streams.filter(progressive=True)
+        if audio_only_streams:
+            stream: Stream = get_best_audio_stream(audio_only_streams)
+            url = stream.url
+        else:
+            stream: Stream = get_best_video_stream(progressive_stream)
+            url = stream.url
+        vc.play(discord.FFmpegPCMAudio(url, **FFMPEG_OPTIONS),
                 after=lambda e: asyncio.run_coroutine_threadsafe(play_youtube_audio(ctx), bot.loop))
 
     @bot.command()
@@ -169,8 +155,6 @@ def main():
             current_playlist_index += skip_amount
             vc.stop()
             await ctx.send(f"Skipped {skip_amount + 1} songs")
-            # await play_music(ctx)
-        # await queue(ctx)
 
     @bot.command(aliases=["q"])
     async def queue(ctx):
@@ -183,7 +167,7 @@ def main():
                 break
             if i == current_playlist_index and current_playlist_index < len(playlist) and is_playing:
                 retval += "► "
-            retval += f"{playlist[i].get('title')}\n"
+            retval += f"{playlist[i].title}\n"
         if retval != "Playlist:\n":
             await ctx.send(retval)
         else:
