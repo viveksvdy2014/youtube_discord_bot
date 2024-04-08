@@ -10,7 +10,6 @@ load_dotenv()
 DISCORD_API_KEY = os.getenv("DISCORD_API_KEY")
 GUILD_ID = discord.Object(id=int(os.getenv("GUILD_ID")))
 os.environ["path"] += os.pathsep + os.getenv("FFMPEG_PATH")
-os.environ["path"] += os.pathsep + os.getenv("YOUTUBE_DL_PATH")
 
 BASE_DIR = pathlib.Path(__file__).parent
 
