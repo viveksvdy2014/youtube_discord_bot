@@ -6,6 +6,7 @@ import sys
 import time
 import traceback
 import uuid
+import pathlib
 
 import discord
 from discord import Member, VoiceState, VoiceClient, VoiceChannel, Reaction, Message
@@ -21,13 +22,17 @@ FFMPEG_OPTIONS = {"before_options": "-reconnect 1 -reconnect_streamed 1 -reconne
                   "options": "-vn"}
 
 
+BASE_DIR = pathlib.Path(__file__).parent
+LOGS_DIR = BASE_DIR / "logs"
+
+
 def setup_logger():
     logger = logging.getLogger('discord')
     logger.setLevel(logging.DEBUG)
     logging.getLogger('discord.http').setLevel(logging.INFO)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     handler = logging.handlers.RotatingFileHandler(
-        filename='logs/discord.log',
+        filename= LOGS_DIR / "discord.log",
         encoding='utf-8',
         maxBytes=32 * 1024 * 1024,  # 32 MiB
         backupCount=5,  # Rotate through 5 files
@@ -267,7 +272,7 @@ class YouTubePlayer(Cog):
             elif choice == "3️⃣":
                 selected_track = search_results[2]
             # await insert_playlist_item_to_playlist(selected_track)
-    
+
             await self.play_selected_track(selected_track, search_id, user, context)
 
         async def check_history_result():

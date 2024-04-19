@@ -11,7 +11,6 @@ load_dotenv(BASE_DIR / ".env")
 
 DISCORD_API_KEY = os.getenv("DISCORD_API_KEY")
 GUILD_ID = discord.Object(id=int(os.getenv("GUILD_ID")))
-os.environ["path"] += os.pathsep + os.getenv("FFMPEG_PATH")
 
 COMMANDS_DIR = BASE_DIR / "cmds"
 COGS_DIR = BASE_DIR / "cogs"
