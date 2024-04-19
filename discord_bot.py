@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import time
+import traceback
 import uuid
 
 import discord
@@ -165,8 +166,9 @@ class YouTubePlayer(Cog):
         history_items, total_pages = get_recent_history_items(page)
         history_items = [f"{(page - 1) * 10 + index + 1}) {item[2]} - {item[3]} (Added by {item[1]}) (ID: {item[0]})"
                          for index, item in enumerate(history_items)]
+        history_items_string = '\n'.join(history_items)
         message = await context.send(f"Playback history (Page {page} out of {total_pages}): \n"
-                                     f"{'\n'.join(history_items)}", delete_after=60)
+                                     f"{history_items_string}", delete_after=60)
         reaction_emojis = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
         for i in range(len(history_items)):
             await message.add_reaction(reaction_emojis[i])
@@ -229,6 +231,20 @@ class YouTubePlayer(Cog):
         if context.channel.name != "youtube-music-bot" and context.channel.name != "bot_test":
             return
         await context.channel.purge(limit=300)
+
+    @command(aliases=["rs"])
+    async def restart(self, context: Context):
+        await context.message.delete(delay=2)
+        await context.send("Restarting Bot!", delete_after=2)
+        time.sleep(2)
+        sys.exit(0)
+
+    @command(aliases=["dc", "l"])
+    async def disconnect(self, context: Context):
+        await context.message.delete(delay=2)
+        await context.send("Disconnecting from Voice Channel!", delete_after=2)
+        time.sleep(2)
+        await context.voice_client.disconnect(force=True)
 
     @Cog.listener()
     async def on_reaction_add(self, reaction: Reaction, user: Member):
@@ -314,6 +330,7 @@ class YouTubePlayer(Cog):
         except:
             self.logger.error("Failed to connect to Voice Client")
             self.is_playing = False
+            print(traceback.format_exc())
         else:
             playing_item: YoutubeSearchResult = list(self.playlist[self.current_playlist_index].values())[0]
             await context.send(f"Now playing: {playing_item.title} - (Channel: {playing_item.uploader_name})",
