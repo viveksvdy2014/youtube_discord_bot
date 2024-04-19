@@ -5,17 +5,17 @@ import pathlib
 import discord
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = pathlib.Path(__file__).parent
+
+load_dotenv(BASE_DIR / ".env")
 
 DISCORD_API_KEY = os.getenv("DISCORD_API_KEY")
 GUILD_ID = discord.Object(id=int(os.getenv("GUILD_ID")))
 os.environ["path"] += os.pathsep + os.getenv("FFMPEG_PATH")
-os.environ["path"] += os.pathsep + os.getenv("YOUTUBE_DL_PATH")
-
-BASE_DIR = pathlib.Path(__file__).parent
 
 COMMANDS_DIR = BASE_DIR / "cmds"
 COGS_DIR = BASE_DIR / "cogs"
+LOGS_DIR = BASE_DIR / "logs"
 
 LOGGING_CONFIG = {
     "version": 1,
@@ -42,7 +42,7 @@ LOGGING_CONFIG = {
         "file": {
             "level": "INFO",
             "class": "logging.FileHandler",
-            "filename": "logs/infos.log",
+            "filename": LOGS_DIR / "infos.log",
             "mode": "w",
             "formatter": "verbose",
         },
