@@ -59,11 +59,14 @@ def initialize_playlist_table():
 
 def insert_playlist_item_to_history_db(youtube_item: YoutubeSearchResult):
     check_existing_item_query = f'select * from {HISTORY_TABLE_NAME} WHERE WATCH_URL = \'{youtube_item.watch_url}\''
+    cleaned_added_by = youtube_item.added_by.replace("'", "''")
+    cleaned_title = youtube_item.title.replace("'", "''")
+    cleaned_uploader_name = youtube_item.uploader_name.replace("'", "''")
     insert_query = f"INSERT INTO {HISTORY_TABLE_NAME} VALUES (" \
                    f"'{youtube_item.uuid}', " \
-                   f"'{youtube_item.added_by.replace("'", "''")}', " \
-                   f"'{youtube_item.title.replace("'", "''")}', " \
-                   f"'{youtube_item.uploader_name.replace("'", "''")}', " \
+                   f"'{cleaned_added_by}', " \
+                   f"'{cleaned_title}', " \
+                   f"'{cleaned_uploader_name}', " \
                    f"'{youtube_item.watch_url}', " \
                    f"'{datetime.now()}'" \
                    f")"
